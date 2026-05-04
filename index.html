@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ひらがな えあわせ</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">ゆびで かける ひらがなゲーム</p>
+          <h1>ひらがな えあわせ</h1>
+        </div>
+        <div class="top-tools">
+          <div class="score-panel" aria-live="polite">
+            <span class="score-label">できた</span>
+            <strong id="scoreText">0 / 46</strong>
+          </div>
+          <button id="stageToggleButton" class="tool-button" type="button">もじをえらぶ</button>
+          <button id="adultToggleButton" class="tool-button adult" type="button">おとな</button>
+        </div>
+      </header>
+
+      <section class="level-panel" aria-label="れべるをえらぶ">
+        <button id="levelZeroButton" class="level-button is-active" type="button">
+          <span>れべる0</span>
+          <strong>なぞり</strong>
+        </button>
+        <button id="levelOneButton" class="level-button" type="button">
+          <span>れべる1</span>
+          <strong>あなうめ</strong>
+        </button>
+        <button id="levelTwoButton" class="level-button" type="button">
+          <span>れべる2</span>
+          <strong>2もじ</strong>
+        </button>
+        <button id="levelThreeButton" class="level-button" type="button">
+          <span>れべる3</span>
+          <strong>てんてん</strong>
+        </button>
+        <button id="levelFourButton" class="level-button" type="button">
+          <span>れべる4</span>
+          <strong>ちいさい</strong>
+        </button>
+        <button id="levelFiveButton" class="level-button" type="button">
+          <span>れべる5</span>
+          <strong>3もじ+</strong>
+        </button>
+        <button id="levelSixButton" class="level-button" type="button" aria-disabled="false">
+          <span>れべる6</span>
+          <strong>つなぎ</strong>
+        </button>
+        <p id="levelStatusText" class="level-status">れべるは じゆうに えらべるよ</p>
+      </section>
+
+      <section id="adultPanel" class="adult-panel" aria-label="おとなのかくにん" hidden>
+        <div>
+          <p class="adult-kicker">保護者・先生向け</p>
+          <h2>つまずき確認</h2>
+        </div>
+        <div id="adultSummary" class="adult-summary" aria-live="polite"></div>
+        <ol id="struggleList" class="struggle-list"></ol>
+        <div class="adult-actions">
+          <button id="customEditorButton" class="tool-button" type="button" aria-expanded="false" aria-controls="customLessonPanel">問題を追加</button>
+          <button id="questionListButton" class="tool-button" type="button" aria-expanded="false" aria-controls="questionListPanel">問題一覧をひらく</button>
+          <button id="resetProgressButton" class="tool-button danger" type="button">できた記録をリセット</button>
+        </div>
+        <form id="customLessonPanel" class="custom-lesson-panel" hidden>
+          <h3>問題を追加</h3>
+          <div class="custom-form-grid">
+            <label>
+              レベル
+              <select id="customLevelSelect">
+                <option value="fill">レベル1 1文字穴うめ</option>
+                <option value="word">レベル2 2文字</option>
+                <option value="dakuten">レベル3 濁音・半濁音</option>
+                <option value="small">レベル4 小さい文字</option>
+                <option value="long">レベル5 3文字以上</option>
+                <option value="sentence">レベル6 つなぎもじ</option>
+              </select>
+            </label>
+            <label>
+              こたえ
+              <input id="customAnswerInput" type="text" autocomplete="off" placeholder="いぬ">
+            </label>
+            <label>
+              問題文
+              <input id="customPromptInput" type="text" autocomplete="off" placeholder="レベル6だけ：とり？とぶ。">
+            </label>
+            <label>
+              絵画像
+              <input id="customImageInput" type="file" accept="image/*">
+            </label>
+          </div>
+          <div class="custom-form-footer">
+            <div class="custom-image-preview">
+              <img id="customImagePreview" alt="追加する絵のプレビュー" hidden>
+            </div>
+            <p id="customLessonMessage" class="custom-lesson-message" aria-live="polite"></p>
+            <button id="customLessonSaveButton" class="tool-button" type="submit">追加する</button>
+          </div>
+        </form>
+        <div id="questionListPanel" class="question-list-panel" hidden>
+          <h3>絵とこたえの一覧</h3>
+          <div class="question-filter-bar" aria-label="問題一覧のフィルタ">
+            <label>
+              レベル
+              <select id="questionFilterLevel">
+                <option value="all">すべて</option>
+                <option value="trace">レベル0</option>
+                <option value="fill">レベル1</option>
+                <option value="word">レベル2</option>
+                <option value="dakuten">レベル3</option>
+                <option value="small">レベル4</option>
+                <option value="long">レベル5</option>
+                <option value="sentence">レベル6</option>
+              </select>
+            </label>
+            <label>
+              種類
+              <select id="questionFilterSource">
+                <option value="all">すべて</option>
+                <option value="standard">標準</option>
+                <option value="custom">追加</option>
+              </select>
+            </label>
+            <label>
+              検索
+              <input id="questionFilterText" type="search" autocomplete="off" placeholder="いぬ / とり？">
+            </label>
+            <button id="questionFilterResetButton" class="tool-button" type="button">解除</button>
+            <p id="questionFilterCount" class="question-filter-count" aria-live="polite"></p>
+          </div>
+          <div class="question-list-wrap" tabindex="0">
+            <table class="question-list">
+              <thead>
+                <tr>
+                  <th scope="col">レベル</th>
+                  <th scope="col">絵</th>
+                  <th scope="col">問題</th>
+                  <th scope="col">こたえ</th>
+                  <th scope="col">書く文字</th>
+                  <th scope="col">操作</th>
+                </tr>
+              </thead>
+              <tbody id="questionListBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="game-layout" aria-label="ひらがなをかくゲーム">
+        <aside class="picture-panel">
+          <div class="picture-wrap" aria-hidden="true">
+            <span id="pictureEmoji" class="picture-emoji">☔</span>
+          </div>
+          <div class="prompt-copy">
+            <p id="promptLabel" class="prompt-label">じゅんばんに かこう</p>
+            <p id="pictureWord" class="picture-word">？？？</p>
+          </div>
+          <div class="target-tile" aria-live="polite">
+            <span class="target-label">かく もじ</span>
+            <div id="targetKana" class="target-kana-svg" aria-label="あ"></div>
+          </div>
+        </aside>
+
+        <section class="write-panel">
+          <div class="canvas-shell">
+            <canvas id="writingCanvas" aria-label="ひらがなをかくばしょ"></canvas>
+            <div id="successBadge" class="success-badge" hidden>できた！</div>
+            <div id="resultMark" class="result-mark" aria-live="polite" hidden></div>
+          </div>
+
+          <div class="action-row">
+            <button id="undoButton" class="icon-button" type="button" title="ひとつまえにもどる" aria-label="ひとつまえにもどる">
+              ↶
+            </button>
+            <button id="clearButton" class="icon-button" type="button" title="このもじをやりなおす" aria-label="このもじをやりなおす">
+              ↺
+            </button>
+            <button id="hintButton" class="mode-button" type="button">
+              おてほんせん
+            </button>
+            <button id="nextButton" class="next-button" type="button">
+              つぎへ
+            </button>
+          </div>
+        </section>
+
+        <aside class="lesson-panel">
+          <p id="statusMessage" class="status-message">1かくめを、1のまるからなぞろう</p>
+          <ol id="strokeList" class="stroke-list" aria-label="かくじゅん"></ol>
+        </aside>
+      </section>
+
+      <nav id="stageStrip" class="stage-strip" aria-label="もじをえらぶ" hidden></nav>
+    </main>
+
+    <script src="script.js"></script>
+  </body>
+</html>
