@@ -687,6 +687,8 @@ const undoButton = document.querySelector("#undoButton");
 const clearButton = document.querySelector("#clearButton");
 const hintButton = document.querySelector("#hintButton");
 const nextButton = document.querySelector("#nextButton");
+const menuToggleButton = document.querySelector("#menuToggleButton");
+const levelPanel = document.querySelector("#levelPanel");
 const stageToggleButton = document.querySelector("#stageToggleButton");
 const adultToggleButton = document.querySelector("#adultToggleButton");
 const adultPanel = document.querySelector("#adultPanel");
@@ -722,6 +724,8 @@ const levelFiveButton = document.querySelector("#levelFiveButton");
 const levelSixButton = document.querySelector("#levelSixButton");
 const levelStatusText = document.querySelector("#levelStatusText");
 
+const compactMenuMedia = window.matchMedia ? window.matchMedia("(max-width: 980px)") : { matches: false };
+
 const state = {
   activeLevel: LEVELS.TRACE,
   lessonIndex: 0,
@@ -741,6 +745,8 @@ const state = {
   drawing: false,
   autoAdvanceTimer: 0,
   autoAdvanceCallback: null,
+  menuPanelOpen: !compactMenuMedia.matches,
+  menuPanelTouched: false,
   stageListOpen: false,
   adultPanelOpen: false,
   customEditorOpen: false,
@@ -1932,10 +1938,16 @@ function render() {
   targetKana.replaceChildren(revealTarget ? createKanaSampleSvg(lesson) : createTargetPlaceholder());
   scoreText.textContent = scoreTextForLevel();
   renderHintControl();
+  menuToggleButton.textContent = state.menuPanelOpen ? "とじる" : "メニュー";
+  menuToggleButton.setAttribute("aria-label", state.menuPanelOpen ? "メニューをとじる" : "メニューをひらく");
+  menuToggleButton.setAttribute("aria-expanded", String(state.menuPanelOpen));
+  menuToggleButton.classList.toggle("is-open", state.menuPanelOpen);
+  levelPanel.hidden = !state.menuPanelOpen;
   stageToggleButton.textContent = state.stageListOpen ? "もじをとじる" : "もじをえらぶ";
   stageToggleButton.hidden = state.activeLevel !== LEVELS.TRACE;
-  adultPanel.hidden = !state.adultPanelOpen;
-  adultToggleButton.classList.toggle("is-open", state.adultPanelOpen);
+  adultPanel.hidden = !state.menuPanelOpen || !state.adultPanelOpen;
+  adultToggleButton.setAttribute("aria-expanded", String(state.menuPanelOpen && state.adultPanelOpen));
+  adultToggleButton.classList.toggle("is-open", state.menuPanelOpen && state.adultPanelOpen);
 
   renderStrokeList(lesson);
   renderStageStrip();
@@ -3035,6 +3047,8 @@ function selectLevel(level) {
   }
 
   if (state.activeLevel === level) {
+    closeMenuAfterCompactChoice();
+    render();
     return;
   }
 
@@ -3061,7 +3075,18 @@ function selectLevel(level) {
     setMessage("1かくめを、まるから おてほんに そって なぞろう", "normal");
   }
 
+  closeMenuAfterCompactChoice();
   render();
+}
+
+function closeMenuAfterCompactChoice() {
+  if (!compactMenuMedia.matches) {
+    return;
+  }
+
+  state.menuPanelTouched = true;
+  state.menuPanelOpen = false;
+  state.adultPanelOpen = false;
 }
 
 function wordLevelStartMessage() {
@@ -3080,6 +3105,17 @@ function wordLevelStartMessage() {
   }
 }
 
+function toggleMenuPanel() {
+  state.menuPanelTouched = true;
+  state.menuPanelOpen = !state.menuPanelOpen;
+
+  if (!state.menuPanelOpen) {
+    state.adultPanelOpen = false;
+  }
+
+  render();
+}
+
 function toggleStageList() {
   if (state.activeLevel !== LEVELS.TRACE) {
     return;
@@ -3090,7 +3126,15 @@ function toggleStageList() {
 }
 
 function toggleAdultPanel() {
-  state.adultPanelOpen = !state.adultPanelOpen;
+  state.menuPanelTouched = true;
+
+  if (!state.menuPanelOpen) {
+    state.menuPanelOpen = true;
+    state.adultPanelOpen = true;
+  } else {
+    state.adultPanelOpen = !state.adultPanelOpen;
+  }
+
   render();
 }
 
@@ -3183,15 +3227,40 @@ function handleNextButton() {
   goNextLesson();
 }
 
+function syncMenuPanelForViewport() {
+  if (state.menuPanelTouched) {
+    return false;
+  }
+
+  const nextOpen = !compactMenuMedia.matches;
+  if (state.menuPanelOpen === nextOpen) {
+    return false;
+  }
+
+  state.menuPanelOpen = nextOpen;
+  if (!nextOpen) {
+    state.adultPanelOpen = false;
+  }
+  return true;
+}
+
+function handleWindowResize() {
+  resizeCanvas();
+  if (syncMenuPanelForViewport()) {
+    render();
+  }
+}
+
 canvas.addEventListener("pointerdown", startDrawing);
 canvas.addEventListener("pointermove", continueDrawing);
 canvas.addEventListener("pointerup", stopDrawing);
 canvas.addEventListener("pointercancel", stopDrawing);
-window.addEventListener("resize", resizeCanvas);
+window.addEventListener("resize", handleWindowResize);
 undoButton.addEventListener("click", undoStroke);
 clearButton.addEventListener("click", clearLesson);
 hintButton.addEventListener("click", toggleHint);
 nextButton.addEventListener("click", handleNextButton);
+menuToggleButton.addEventListener("click", toggleMenuPanel);
 stageToggleButton.addEventListener("click", toggleStageList);
 adultToggleButton.addEventListener("click", toggleAdultPanel);
 customEditorButton.addEventListener("click", toggleCustomEditor);

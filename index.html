@@ -18,12 +18,13 @@
             <span class="score-label">できた</span>
             <strong id="scoreText">0 / 46</strong>
           </div>
+          <button id="menuToggleButton" class="tool-button menu" type="button" aria-expanded="true" aria-controls="levelPanel adultPanel">メニュー</button>
           <button id="stageToggleButton" class="tool-button" type="button">もじをえらぶ</button>
-          <button id="adultToggleButton" class="tool-button adult" type="button">おとな</button>
+          <button id="adultToggleButton" class="tool-button adult" type="button" aria-expanded="false" aria-controls="adultPanel">おとな</button>
         </div>
       </header>
 
-      <section class="level-panel" aria-label="れべるをえらぶ">
+      <section id="levelPanel" class="level-panel" aria-label="れべるをえらぶ">
         <button id="levelZeroButton" class="level-button is-active" type="button">
           <span>れべる0</span>
           <strong>なぞり</strong>
