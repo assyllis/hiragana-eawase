@@ -437,6 +437,7 @@ const CUSTOM_LESSONS_KEY = "hiragana-eawase-custom-lessons-v1";
 const IMAGE_DB_NAME = "hiragana-eawase-images-v1";
 const IMAGE_STORE_NAME = "images";
 const CUSTOM_IMAGE_MAX_SIZE = 520;
+const CUSTOM_EXPORT_VERSION = 1;
 const KANJIVG_VIEWBOX_SIZE = 109;
 const AUTO_HINT_MISS_COUNT = 3;
 const NEXT_CHAR_ADVANCE_DELAY = 1300;
@@ -691,6 +692,7 @@ const adultToggleButton = document.querySelector("#adultToggleButton");
 const adultPanel = document.querySelector("#adultPanel");
 const adultSummary = document.querySelector("#adultSummary");
 const struggleList = document.querySelector("#struggleList");
+const adultDataMessage = document.querySelector("#adultDataMessage");
 const customEditorButton = document.querySelector("#customEditorButton");
 const customLessonPanel = document.querySelector("#customLessonPanel");
 const customLevelSelect = document.querySelector("#customLevelSelect");
@@ -707,6 +709,9 @@ const questionFilterSource = document.querySelector("#questionFilterSource");
 const questionFilterText = document.querySelector("#questionFilterText");
 const questionFilterResetButton = document.querySelector("#questionFilterResetButton");
 const questionFilterCount = document.querySelector("#questionFilterCount");
+const exportCustomLessonsButton = document.querySelector("#exportCustomLessonsButton");
+const importCustomLessonsButton = document.querySelector("#importCustomLessonsButton");
+const importCustomLessonsInput = document.querySelector("#importCustomLessonsInput");
 const resetProgressButton = document.querySelector("#resetProgressButton");
 const levelZeroButton = document.querySelector("#levelZeroButton");
 const levelOneButton = document.querySelector("#levelOneButton");
@@ -2253,6 +2258,16 @@ function setCustomLessonMessage(text, tone = "normal") {
   customLessonMessage.classList.toggle("is-good", tone === "good");
 }
 
+function setAdultDataMessage(text, tone = "normal") {
+  if (!adultDataMessage) {
+    return;
+  }
+
+  adultDataMessage.textContent = text;
+  adultDataMessage.classList.toggle("is-alert", tone === "alert");
+  adultDataMessage.classList.toggle("is-good", tone === "good");
+}
+
 function clearCustomLessonForm() {
   if (customAnswerInput) {
     customAnswerInput.value = "";
@@ -2578,6 +2593,182 @@ function loadCustomLessonImages() {
           state.missingImageIds.add(imageId);
         }))
   );
+}
+
+async function exportCustomLessons() {
+  if (state.customLessons.length === 0) {
+    setAdultDataMessage("書き出す追加問題がありません。", "alert");
+    return;
+  }
+
+  try {
+    setAdultDataMessage("追加問題を書き出しています。", "normal");
+    const lessons = await Promise.all(state.customLessons.map(async (lesson) => {
+      const imageBlob = await getImageBlob(lesson.imageId).catch(() => null);
+      return {
+        lesson: customLessonForExport(lesson),
+        image: imageBlob
+          ? {
+              type: imageBlob.type || "image/webp",
+              dataUrl: await blobToDataUrl(imageBlob)
+            }
+          : null
+      };
+    }));
+    const exportData = {
+      app: "hiragana-eawase",
+      version: CUSTOM_EXPORT_VERSION,
+      exportedAt: new Date().toISOString(),
+      lessons
+    };
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+    downloadBlob(blob, `hiragana-eawase-custom-${dateStamp()}.json`);
+    setAdultDataMessage(`${state.customLessons.length}件の追加問題を書き出しました。`, "good");
+  } catch (error) {
+    setAdultDataMessage("追加問題を書き出せませんでした。", "alert");
+  }
+}
+
+function customLessonForExport(lesson) {
+  const exported = {
+    id: lesson.id,
+    key: lesson.key,
+    source: "custom",
+    level: lesson.level,
+    word: lesson.word,
+    picture: lesson.picture,
+    imageId: lesson.imageId,
+    kanaSequence: [...lesson.kanaSequence]
+  };
+
+  if (lesson.level === LEVELS.FILL) {
+    exported.kana = lesson.kana;
+  }
+
+  if (lesson.level === LEVELS.SENTENCE) {
+    exported.prefix = lesson.prefix || "";
+    exported.suffix = lesson.suffix || "";
+    exported.phase = lesson.phase || 1;
+  }
+
+  return exported;
+}
+
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+
+function dataUrlToBlob(dataUrl) {
+  const [metadata, content] = String(dataUrl || "").split(",");
+  const match = metadata?.match(/^data:([^;]+);base64$/);
+  if (!match || !content) {
+    throw new Error("Invalid image data.");
+  }
+
+  const binary = atob(content);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+
+  return new Blob([bytes], { type: match[1] || "image/webp" });
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function dateStamp() {
+  const now = new Date();
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`;
+}
+
+function openCustomLessonImport() {
+  if (!importCustomLessonsInput) {
+    return;
+  }
+
+  importCustomLessonsInput.value = "";
+  importCustomLessonsInput.click();
+}
+
+async function handleCustomLessonsImport() {
+  const file = importCustomLessonsInput?.files?.[0];
+  if (!file) {
+    return;
+  }
+
+  try {
+    setAdultDataMessage("追加問題を読み込んでいます。", "normal");
+    const data = JSON.parse(await file.text());
+    const result = await importCustomLessonPackage(data);
+    const message = [
+      `${result.added}件を読み込みました`,
+      result.skipped ? `${result.skipped}件は重複のためスキップ` : "",
+      result.failed ? `${result.failed}件は読み込めませんでした` : ""
+    ].filter(Boolean).join("。");
+    setAdultDataMessage(message || "読み込みました。", result.failed ? "alert" : "good");
+    state.questionListOpen = true;
+    render();
+  } catch (error) {
+    setAdultDataMessage("追加問題ファイルを読み込めませんでした。", "alert");
+  } finally {
+    importCustomLessonsInput.value = "";
+  }
+}
+
+async function importCustomLessonPackage(data) {
+  if (!data || data.app !== "hiragana-eawase" || !Array.isArray(data.lessons)) {
+    throw new Error("Unsupported import data.");
+  }
+
+  const existingKeys = new Set(state.customLessons.map((lesson) => lessonCompletionKey(lesson)));
+  const result = { added: 0, skipped: 0, failed: 0 };
+
+  for (const item of data.lessons) {
+    try {
+      const lesson = normalizeCustomLesson(item.lesson || item);
+      const imageDataUrl = item.image?.dataUrl;
+      if (!lesson || !imageDataUrl || unsupportedKana(lesson.kanaSequence).length > 0) {
+        result.failed += 1;
+        continue;
+      }
+
+      if (existingKeys.has(lessonCompletionKey(lesson))) {
+        result.skipped += 1;
+        continue;
+      }
+
+      const imageBlob = dataUrlToBlob(imageDataUrl);
+      await saveImageBlob(lesson.imageId, imageBlob);
+      cacheImageBlob(lesson.imageId, imageBlob);
+      state.customLessons.push(lesson);
+      existingKeys.add(lessonCompletionKey(lesson));
+      result.added += 1;
+    } catch {
+      result.failed += 1;
+    }
+  }
+
+  if (result.added > 0) {
+    saveCustomLessons();
+    refreshCurrentLessonAfterCustomChange(state.activeLevel);
+  }
+
+  return result;
 }
 
 function prepareImageBlob(file) {
@@ -3011,6 +3202,9 @@ questionFilterLevel.addEventListener("change", updateQuestionFilters);
 questionFilterSource.addEventListener("change", updateQuestionFilters);
 questionFilterText.addEventListener("input", updateQuestionFilters);
 questionFilterResetButton.addEventListener("click", resetQuestionFilters);
+exportCustomLessonsButton.addEventListener("click", exportCustomLessons);
+importCustomLessonsButton.addEventListener("click", openCustomLessonImport);
+importCustomLessonsInput.addEventListener("change", handleCustomLessonsImport);
 resetProgressButton.addEventListener("click", resetProgress);
 levelZeroButton.addEventListener("click", () => selectLevel(LEVELS.TRACE));
 levelOneButton.addEventListener("click", () => selectLevel(LEVELS.FILL));
