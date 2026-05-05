@@ -20,11 +20,14 @@
 
 html {
   min-height: 100%;
+  overscroll-behavior-x: none;
 }
 
 body {
   min-height: 100%;
   margin: 0;
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
   font-family: "Yu Gothic", "Hiragino Sans", "Meiryo", system-ui, sans-serif;
   color: var(--ink);
   background:
@@ -46,6 +49,7 @@ button {
   min-height: 100vh;
   margin: 0 auto;
   padding: 24px 0;
+  touch-action: pan-y;
 }
 
 .topbar {
@@ -638,6 +642,9 @@ h1 {
     linear-gradient(90deg, transparent calc(50% - 1px), rgba(47, 125, 209, 0.14) 50%, transparent calc(50% + 1px)),
     linear-gradient(0deg, transparent calc(50% - 1px), rgba(47, 125, 209, 0.14) 50%, transparent calc(50% + 1px)),
     #ffffff;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 #writingCanvas {
@@ -910,7 +917,7 @@ h1 {
   color: #176548;
 }
 
-@media (max-width: 980px) {
+@media (max-width: 980px), (pointer: coarse) and (max-width: 1366px) {
   .game-layout {
     grid-template-columns: 1fr;
   }

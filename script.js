@@ -89,7 +89,7 @@ const lessons = [
   },
   {
     kana: "こ",
-    word: "こい",
+    word: "こいのぼり",
     picture: "🎏",
     strokes: [
       { label: "1かくめ", pathD: "M34.75,26.75c1.12,0.88,2.91,2.01,6,1.5c7.62-1.25,14.11-2.56,22.38-2.62c15.5-0.12,5.88,5-5.75,9", points: [[34.75, 26.75], [57.38, 34.63]], guideWidth: 8.5, minLength: 0.1 },
@@ -672,6 +672,7 @@ const allLessons = [...lessons, ...extraLessons];
 const lessonByKana = new Map(allLessons.map((lesson) => [lesson.kana, lesson]));
 
 const canvas = document.querySelector("#writingCanvas");
+const canvasShell = document.querySelector(".canvas-shell");
 const ctx = canvas.getContext("2d");
 const pictureEmoji = document.querySelector("#pictureEmoji");
 const promptLabel = document.querySelector("#promptLabel");
@@ -724,7 +725,8 @@ const levelFiveButton = document.querySelector("#levelFiveButton");
 const levelSixButton = document.querySelector("#levelSixButton");
 const levelStatusText = document.querySelector("#levelStatusText");
 
-const compactMenuMedia = window.matchMedia ? window.matchMedia("(max-width: 980px)") : { matches: false };
+const TABLET_MEDIA_QUERY = "(max-width: 980px), (pointer: coarse) and (max-width: 1366px)";
+const compactMenuMedia = window.matchMedia ? window.matchMedia(TABLET_MEDIA_QUERY) : { matches: false };
 
 const state = {
   activeLevel: LEVELS.TRACE,
@@ -3251,10 +3253,18 @@ function handleWindowResize() {
   }
 }
 
+function preventWritingAreaDrag(event) {
+  if (event.cancelable) {
+    event.preventDefault();
+  }
+}
+
 canvas.addEventListener("pointerdown", startDrawing);
 canvas.addEventListener("pointermove", continueDrawing);
 canvas.addEventListener("pointerup", stopDrawing);
 canvas.addEventListener("pointercancel", stopDrawing);
+canvasShell.addEventListener("touchstart", preventWritingAreaDrag, { passive: false });
+canvasShell.addEventListener("touchmove", preventWritingAreaDrag, { passive: false });
 window.addEventListener("resize", handleWindowResize);
 undoButton.addEventListener("click", undoStroke);
 clearButton.addEventListener("click", clearLesson);
