@@ -672,7 +672,6 @@ const allLessons = [...lessons, ...extraLessons];
 const lessonByKana = new Map(allLessons.map((lesson) => [lesson.kana, lesson]));
 
 const canvas = document.querySelector("#writingCanvas");
-const canvasShell = document.querySelector(".canvas-shell");
 const ctx = canvas.getContext("2d");
 const pictureEmoji = document.querySelector("#pictureEmoji");
 const promptLabel = document.querySelector("#promptLabel");
@@ -725,7 +724,7 @@ const levelFiveButton = document.querySelector("#levelFiveButton");
 const levelSixButton = document.querySelector("#levelSixButton");
 const levelStatusText = document.querySelector("#levelStatusText");
 
-const TABLET_MEDIA_QUERY = "(max-width: 980px), (pointer: coarse) and (max-width: 1366px)";
+const TABLET_MEDIA_QUERY = "(max-width: 980px), (orientation: portrait) and (pointer: coarse) and (max-width: 1100px), (orientation: landscape) and (pointer: coarse) and (min-width: 981px) and (max-width: 1366px)";
 const compactMenuMedia = window.matchMedia ? window.matchMedia(TABLET_MEDIA_QUERY) : { matches: false };
 
 const state = {
@@ -3253,18 +3252,10 @@ function handleWindowResize() {
   }
 }
 
-function preventWritingAreaDrag(event) {
-  if (event.cancelable) {
-    event.preventDefault();
-  }
-}
-
 canvas.addEventListener("pointerdown", startDrawing);
 canvas.addEventListener("pointermove", continueDrawing);
 canvas.addEventListener("pointerup", stopDrawing);
 canvas.addEventListener("pointercancel", stopDrawing);
-canvasShell.addEventListener("touchstart", preventWritingAreaDrag, { passive: false });
-canvasShell.addEventListener("touchmove", preventWritingAreaDrag, { passive: false });
 window.addEventListener("resize", handleWindowResize);
 undoButton.addEventListener("click", undoStroke);
 clearButton.addEventListener("click", clearLesson);
