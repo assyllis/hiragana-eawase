@@ -434,6 +434,7 @@ const FILL_STORAGE_KEY = "hiragana-eawase-complete-fill-v1";
 const WORD_STORAGE_KEY = "hiragana-eawase-complete-words-v1";
 const STRUGGLE_STORAGE_KEY = "hiragana-eawase-struggles-v1";
 const CUSTOM_LESSONS_KEY = "hiragana-eawase-custom-lessons-v1";
+const CHALLENGE_STORAGE_KEY = "hiragana-eawase-challenge-scores-v1";
 const IMAGE_DB_NAME = "hiragana-eawase-images-v1";
 const IMAGE_STORE_NAME = "images";
 const CUSTOM_IMAGE_MAX_SIZE = 520;
@@ -461,7 +462,8 @@ const LEVELS = {
   DAKUTEN: "dakuten",
   SMALL: "small",
   LONG: "long",
-  SENTENCE: "sentence"
+  SENTENCE: "sentence",
+  SOUND: "sound"
 };
 const LEVEL_NAMES = {
   [LEVELS.TRACE]: "レベル0 なぞり",
@@ -470,7 +472,8 @@ const LEVEL_NAMES = {
   [LEVELS.DAKUTEN]: "レベル3 濁音・半濁音",
   [LEVELS.SMALL]: "レベル4 小さい文字",
   [LEVELS.LONG]: "レベル5 3文字以上",
-  [LEVELS.SENTENCE]: "レベル6 つなぎもじ"
+  [LEVELS.SENTENCE]: "レベル6 つなぎもじ",
+  [LEVELS.SOUND]: "レベル7 だくおん文字"
 };
 const LEVEL_ORDER = [
   LEVELS.TRACE,
@@ -479,7 +482,8 @@ const LEVEL_ORDER = [
   LEVELS.DAKUTEN,
   LEVELS.SMALL,
   LEVELS.LONG,
-  LEVELS.SENTENCE
+  LEVELS.SENTENCE,
+  LEVELS.SOUND
 ];
 const LEVEL_GOALS = {
   [LEVELS.TRACE]: lessons.length,
@@ -488,8 +492,21 @@ const LEVEL_GOALS = {
   [LEVELS.DAKUTEN]: 6,
   [LEVELS.SMALL]: 6,
   [LEVELS.LONG]: 5,
-  [LEVELS.SENTENCE]: 8
+  [LEVELS.SENTENCE]: 8,
+  [LEVELS.SOUND]: 25
 };
+const CHALLENGE_GOALS = {
+  [LEVELS.TRACE]: 10,
+  [LEVELS.FILL]: 10,
+  [LEVELS.WORD]: 10,
+  [LEVELS.DAKUTEN]: 6,
+  [LEVELS.SMALL]: 6,
+  [LEVELS.LONG]: 5,
+  [LEVELS.SENTENCE]: 8,
+  [LEVELS.SOUND]: 10
+};
+const CHALLENGE_BASE_SCORE = 100;
+const CHALLENGE_DOUBLE_BONUS = 50;
 const FROZEN_LEVELS = new Set();
 const MISS_REASON_LABELS = {
   short: "線が短い",
@@ -531,6 +548,8 @@ function cloneLesson(baseKana, kana) {
 
 function createDakutenLesson(baseKana, kana) {
   const lesson = cloneLesson(baseKana, kana);
+  lesson.word = kana;
+  lesson.picture = kana;
   lesson.strokes = [
     ...lesson.strokes,
     { label: `${lesson.strokes.length + 1}かくめ`, pathD: "M77,16 L83,27", points: [[77, 16], [83, 27]], guideWidth: 7, minLength: 0.045, checkDirection: false },
@@ -541,6 +560,8 @@ function createDakutenLesson(baseKana, kana) {
 
 function createHandakutenLesson(baseKana, kana) {
   const lesson = cloneLesson(baseKana, kana);
+  lesson.word = kana;
+  lesson.picture = kana;
   lesson.strokes = [
     ...lesson.strokes,
     {
@@ -595,6 +616,7 @@ const extraLessons = [
   createSmallKanaLesson("よ", "ょ"),
   createSmallKanaLesson("つ", "っ")
 ];
+const soundMarkLessons = extraLessons.filter((lesson) => !["ゃ", "ゅ", "ょ", "っ"].includes(lesson.kana));
 const fillLessonOverrides = new Map([
   ["い", { word: "いぬ", picture: "🐶" }]
 ]);
@@ -677,6 +699,7 @@ const pictureEmoji = document.querySelector("#pictureEmoji");
 const promptLabel = document.querySelector("#promptLabel");
 const pictureWord = document.querySelector("#pictureWord");
 const targetKana = document.querySelector("#targetKana");
+const scoreLabel = document.querySelector("#scoreLabel");
 const scoreText = document.querySelector("#scoreText");
 const statusMessage = document.querySelector("#statusMessage");
 const strokeList = document.querySelector("#strokeList");
@@ -688,6 +711,17 @@ const clearButton = document.querySelector("#clearButton");
 const hintButton = document.querySelector("#hintButton");
 const nextButton = document.querySelector("#nextButton");
 const menuToggleButton = document.querySelector("#menuToggleButton");
+const challengeToggleButton = document.querySelector("#challengeToggleButton");
+const challengePanel = document.querySelector("#challengePanel");
+const challengeResultPanel = document.querySelector("#challengeResultPanel");
+const challengeScoreText = document.querySelector("#challengeScoreText");
+const challengeRoundText = document.querySelector("#challengeRoundText");
+const challengeDoubleText = document.querySelector("#challengeDoubleText");
+const challengeBestText = document.querySelector("#challengeBestText");
+const challengeResultTitle = document.querySelector("#challengeResultTitle");
+const challengeResultDetail = document.querySelector("#challengeResultDetail");
+const challengeResultBest = document.querySelector("#challengeResultBest");
+const challengeRestartButton = document.querySelector("#challengeRestartButton");
 const levelPanel = document.querySelector("#levelPanel");
 const stageToggleButton = document.querySelector("#stageToggleButton");
 const adultToggleButton = document.querySelector("#adultToggleButton");
@@ -722,6 +756,7 @@ const levelThreeButton = document.querySelector("#levelThreeButton");
 const levelFourButton = document.querySelector("#levelFourButton");
 const levelFiveButton = document.querySelector("#levelFiveButton");
 const levelSixButton = document.querySelector("#levelSixButton");
+const levelSoundButton = document.querySelector("#levelSoundButton");
 const levelStatusText = document.querySelector("#levelStatusText");
 
 const TABLET_MEDIA_QUERY = "(max-width: 980px), (orientation: portrait) and (pointer: coarse) and (max-width: 1100px), (orientation: landscape) and (pointer: coarse) and (min-width: 981px) and (max-width: 1366px)";
@@ -759,6 +794,20 @@ const state = {
   completedKana: loadCompletedKana(),
   completedFillKana: loadCompletedFillKana(),
   completedWords: loadCompletedWords(),
+  challengeScores: loadChallengeScores(),
+  challenge: {
+    active: false,
+    finished: false,
+    level: LEVELS.TRACE,
+    goal: CHALLENGE_GOALS[LEVELS.TRACE],
+    score: 0,
+    correct: 0,
+    double: 0,
+    answered: 0,
+    startTime: 0,
+    elapsedMs: 0,
+    lastResult: null
+  },
   customLessons: loadCustomLessons(),
   imageUrls: new Map(),
   loadingImageIds: new Set(),
@@ -806,6 +855,19 @@ function loadCompletedWords() {
 
 function saveCompletedWords() {
   localStorage.setItem(WORD_STORAGE_KEY, JSON.stringify([...state.completedWords]));
+}
+
+function loadChallengeScores() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(CHALLENGE_STORAGE_KEY) || "{}");
+    return stored && typeof stored === "object" ? stored : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveChallengeScores() {
+  localStorage.setItem(CHALLENGE_STORAGE_KEY, JSON.stringify(state.challengeScores));
 }
 
 function loadStruggleLog() {
@@ -931,6 +993,14 @@ function customLessonsForLevel(level) {
     .filter(Boolean);
 }
 
+function isTraceLevel(level = state.activeLevel) {
+  return level === LEVELS.TRACE || level === LEVELS.SOUND;
+}
+
+function currentTraceSet(level = state.activeLevel) {
+  return level === LEVELS.SOUND ? soundMarkLessons : lessons;
+}
+
 function materializeCustomLesson(lesson) {
   if (lesson.level !== LEVELS.FILL) {
     return lesson;
@@ -957,7 +1027,7 @@ function currentLesson() {
     return currentFill();
   }
 
-  return lessons[state.lessonIndex];
+  return currentTraceSet()[state.lessonIndex];
 }
 
 function isKanaLevelComplete() {
@@ -991,7 +1061,11 @@ function levelGoal(level = state.activeLevel) {
     return Math.min(LEVEL_GOALS[level], currentFillSet().length);
   }
 
-  return LEVEL_GOALS[level];
+  if (isTraceLevel(level)) {
+    return Math.min(LEVEL_GOALS[level], currentTraceSet(level).length);
+  }
+
+  return LEVEL_GOALS[level] || 0;
 }
 
 function completedCountForLevel(level = state.activeLevel) {
@@ -1003,7 +1077,11 @@ function completedCountForLevel(level = state.activeLevel) {
     return currentFillSet().filter((lesson) => state.completedFillKana.has(lessonCompletionKey(lesson))).length;
   }
 
-  return state.completedKana.size;
+  if (isTraceLevel(level)) {
+    return currentTraceSet(level).filter((lesson) => state.completedKana.has(lessonCompletionKey(lesson))).length;
+  }
+
+  return 0;
 }
 
 function completionWillReachGoal(level, key) {
@@ -1367,12 +1445,12 @@ function stopDrawing(event) {
 
 function handleMiss(message, reason = "unknown") {
   const nextMissCount = state.missCount + 1;
-  const willShowHint = state.activeLevel !== LEVELS.TRACE
+  const willShowHint = !isTraceLevel()
     && nextMissCount >= AUTO_HINT_MISS_COUNT
     && !state.showTrace;
   recordStruggle(reason, willShowHint);
 
-  if (state.activeLevel === LEVELS.TRACE) {
+  if (isTraceLevel()) {
     setMessage(message, "alert");
     return;
   }
@@ -1735,6 +1813,7 @@ function completeLesson() {
   if (isWordLevel()) {
     const word = currentWord();
     if (state.wordCharIndex < word.kanaSequence.length - 1) {
+      addChallengeScore(resultType);
       showResultMark(resultType);
       setMessage(resultType === "double" ? "とても きれい！ つぎの もじへ すすむよ" : "できた！ つぎの もじへ すすむよ", "good");
       scheduleAutoAdvance(() => {
@@ -1754,6 +1833,18 @@ function completeLesson() {
       showResultMark(resultType, "テストOK！");
       setMessage(resultType === "double" ? "テストOK！ とても きれいに かけたよ" : "テストOK！ ただしく かけたよ", "good");
       scheduleAutoAdvance(restartCustomTestLesson, COMPLETE_ADVANCE_DELAY);
+      return;
+    }
+
+    if (state.challenge.active) {
+      showResultMark(resultType);
+      if (completeChallengeProblem(resultType)) {
+        return;
+      }
+
+      const nextUnit = state.activeLevel === LEVELS.SENTENCE ? "ぶん" : "ことば";
+      setMessage(resultType === "double" ? `ボーナス！ つぎの${nextUnit}へ` : `できた！ つぎの${nextUnit}へ`, "good");
+      scheduleAutoAdvance(goNextLesson, COMPLETE_ADVANCE_DELAY);
       return;
     }
 
@@ -1781,6 +1872,17 @@ function completeLesson() {
       return;
     }
 
+    if (state.challenge.active) {
+      showResultMark(resultType);
+      if (completeChallengeProblem(resultType)) {
+        return;
+      }
+
+      setMessage(resultType === "double" ? "ボーナス！ つぎの あなうめへ" : "できた！ つぎの あなうめへ", "good");
+      scheduleAutoAdvance(goNextLesson, COMPLETE_ADVANCE_DELAY);
+      return;
+    }
+
     const goalReached = completionWillReachGoal(state.activeLevel, fillKey);
     state.completedFillKana.add(fillKey);
     saveCompletedFillKana();
@@ -1792,6 +1894,17 @@ function completeLesson() {
 
     setMessage(resultType === "double" ? "とても きれい！ つぎの あなうめへ すすむよ" : "できた！ つぎの あなうめへ すすむよ", "good");
   } else {
+    if (state.challenge.active) {
+      showResultMark(resultType);
+      if (completeChallengeProblem(resultType)) {
+        return;
+      }
+
+      setMessage(resultType === "double" ? "ボーナス！ つぎの もじへ" : "できた！ つぎの もじへ", "good");
+      scheduleAutoAdvance(goNextLesson, COMPLETE_ADVANCE_DELAY);
+      return;
+    }
+
     const goalReached = completionWillReachGoal(state.activeLevel, lesson.kana);
     state.completedKana.add(lesson.kana);
     saveCompletedKana();
@@ -1931,12 +2044,13 @@ function render() {
     renderPicture(fill);
     pictureWord.textContent = complete ? fill.word : maskWord(fill.word, fill.kana);
   } else {
-    promptLabel.textContent = "じゅんばんに かこう";
+    promptLabel.textContent = state.activeLevel === LEVELS.SOUND ? "てんてん・まるの もじ" : "じゅんばんに かこう";
     renderPicture(lesson);
     pictureWord.textContent = lesson.kana;
   }
   targetKana.setAttribute("aria-label", revealTarget ? lesson.kana : "ひんとなし");
   targetKana.replaceChildren(revealTarget ? createKanaSampleSvg(lesson) : createTargetPlaceholder());
+  scoreLabel.textContent = state.challenge.active ? "スコア" : "できた";
   scoreText.textContent = scoreTextForLevel();
   renderHintControl();
   menuToggleButton.textContent = state.menuPanelOpen ? "とじる" : "メニュー";
@@ -1945,7 +2059,7 @@ function render() {
   menuToggleButton.classList.toggle("is-open", state.menuPanelOpen);
   levelPanel.hidden = !state.menuPanelOpen;
   stageToggleButton.textContent = state.stageListOpen ? "もじをとじる" : "もじをえらぶ";
-  stageToggleButton.hidden = state.activeLevel !== LEVELS.TRACE;
+  stageToggleButton.hidden = !isTraceLevel() || state.challenge.active;
   adultPanel.hidden = !state.menuPanelOpen || !state.adultPanelOpen;
   adultToggleButton.setAttribute("aria-expanded", String(state.menuPanelOpen && state.adultPanelOpen));
   adultToggleButton.classList.toggle("is-open", state.menuPanelOpen && state.adultPanelOpen);
@@ -1953,6 +2067,7 @@ function render() {
   renderStrokeList(lesson);
   renderStageStrip();
   renderLevelPanel();
+  renderChallengePanel();
   renderAdultPanel();
 
   if (!complete && state.messageTone === "normal") {
@@ -1966,7 +2081,7 @@ function render() {
 }
 
 function defaultWritingMessage() {
-  if (state.activeLevel === LEVELS.TRACE) {
+  if (isTraceLevel()) {
     return `${state.currentStroke + 1}かくめを、まるから おてほんに そって なぞろう`;
   }
 
@@ -1979,7 +2094,7 @@ function defaultWritingMessage() {
 
 function renderHintControl() {
   hintButton.disabled = true;
-  if (state.activeLevel === LEVELS.TRACE) {
+  if (isTraceLevel()) {
     hintButton.textContent = "おてほんせん あり";
   } else if (state.showTrace) {
     hintButton.textContent = "ひんと あり";
@@ -2023,8 +2138,185 @@ function sentenceProgressText() {
 }
 
 function scoreTextForLevel() {
+  if (state.challenge.active) {
+    return `${state.challenge.score}てん`;
+  }
+
   const goal = levelGoal();
   return `${Math.min(completedCountForLevel(), goal)} / ${goal}`;
+}
+
+function challengeGoal(level = state.activeLevel) {
+  if (isWordLevel(level)) {
+    return Math.min(CHALLENGE_GOALS[level] || levelGoal(level), currentWordSet(level).length);
+  }
+
+  if (level === LEVELS.FILL) {
+    return Math.min(CHALLENGE_GOALS[level] || levelGoal(level), currentFillSet().length);
+  }
+
+  if (isTraceLevel(level)) {
+    return Math.min(CHALLENGE_GOALS[level] || levelGoal(level), currentTraceSet(level).length);
+  }
+
+  return CHALLENGE_GOALS[level] || 0;
+}
+
+function challengeLevelKey(level = state.activeLevel) {
+  return level;
+}
+
+function bestChallengeForLevel(level = state.activeLevel) {
+  return state.challengeScores[challengeLevelKey(level)] || null;
+}
+
+function formatElapsedTime(ms) {
+  const seconds = Math.max(0, Math.round((ms || 0) / 1000));
+  const minutes = Math.floor(seconds / 60);
+  const rest = seconds % 60;
+  return minutes > 0 ? `${minutes}ふん${rest}びょう` : `${rest}びょう`;
+}
+
+function renderChallengePanel() {
+  const active = state.challenge.active;
+  const finished = state.challenge.finished;
+  const best = bestChallengeForLevel(state.activeLevel);
+
+  challengeToggleButton.textContent = active ? "やめる" : "チャレンジ";
+  challengeToggleButton.setAttribute("aria-pressed", String(active));
+  challengeToggleButton.classList.toggle("is-active", active);
+
+  challengePanel.hidden = !active;
+  challengeResultPanel.hidden = !finished;
+
+  if (active) {
+    challengeScoreText.textContent = `${state.challenge.score}てん`;
+    challengeRoundText.textContent = `${state.challenge.answered} / ${state.challenge.goal}`;
+    challengeDoubleText.textContent = `${state.challenge.double}こ`;
+    challengeBestText.textContent = best ? `${best.score}てん` : "まだ";
+  }
+
+  if (finished && state.challenge.lastResult) {
+    const result = state.challenge.lastResult;
+    const bestForResult = bestChallengeForLevel(result.level);
+    challengeResultTitle.textContent = `${result.score}てん`;
+    challengeResultDetail.textContent = `${result.correct}もん / ◎${result.double}こ / ${formatElapsedTime(result.elapsedMs)}`;
+    challengeResultBest.textContent = bestForResult ? `${bestForResult.score}てん` : `${result.score}てん`;
+  }
+}
+
+function startChallengeMode() {
+  clearAutoAdvance();
+  state.customTestId = "";
+  state.stageListOpen = false;
+  state.challenge = {
+    active: true,
+    finished: false,
+    level: state.activeLevel,
+    goal: challengeGoal(state.activeLevel),
+    score: 0,
+    correct: 0,
+    double: 0,
+    answered: 0,
+    startTime: Date.now(),
+    elapsedMs: 0,
+    lastResult: null
+  };
+
+  pickChallengeFirstLesson();
+  resetCurrentWriting();
+  setMessage("チャレンジ！ なんもん できるかな", "normal");
+  render();
+}
+
+function stopChallengeMode() {
+  clearAutoAdvance();
+  state.challenge.active = false;
+  state.challenge.finished = false;
+  state.challenge.lastResult = null;
+  resetCurrentWriting();
+  setMessage("チャレンジを やめたよ", "normal");
+  render();
+}
+
+function toggleChallengeMode() {
+  if (state.challenge.active) {
+    stopChallengeMode();
+    return;
+  }
+
+  startChallengeMode();
+}
+
+function pickChallengeFirstLesson() {
+  if (isWordLevel()) {
+    state.wordIndex = nextWordIndex();
+    state.wordCharIndex = 0;
+    return;
+  }
+
+  if (state.activeLevel === LEVELS.FILL) {
+    state.fillIndex = nextFillIndex();
+    state.wordCharIndex = 0;
+    return;
+  }
+
+  if (isTraceLevel()) {
+    const traceSet = currentTraceSet();
+    state.lessonIndex = Math.floor(Math.random() * Math.max(traceSet.length, 1));
+  }
+}
+
+function addChallengeScore(resultType) {
+  if (!state.challenge.active) {
+    return;
+  }
+
+  state.challenge.score += CHALLENGE_BASE_SCORE;
+  if (resultType === "double") {
+    state.challenge.score += CHALLENGE_DOUBLE_BONUS;
+    state.challenge.double += 1;
+  }
+}
+
+function completeChallengeProblem(resultType) {
+  addChallengeScore(resultType);
+  state.challenge.correct += 1;
+  state.challenge.answered += 1;
+
+  if (state.challenge.answered >= state.challenge.goal) {
+    finishChallengeMode();
+    return true;
+  }
+
+  return false;
+}
+
+function finishChallengeMode() {
+  const elapsedMs = Date.now() - state.challenge.startTime;
+  const result = {
+    level: state.challenge.level,
+    score: state.challenge.score,
+    correct: state.challenge.correct,
+    double: state.challenge.double,
+    goal: state.challenge.goal,
+    elapsedMs,
+    playedAt: new Date().toISOString()
+  };
+  const key = challengeLevelKey(result.level);
+  const previous = state.challengeScores[key];
+  if (!previous || result.score > previous.score || (result.score === previous.score && result.elapsedMs < previous.elapsedMs)) {
+    state.challengeScores[key] = result;
+    saveChallengeScores();
+  }
+
+  state.challenge.active = false;
+  state.challenge.finished = true;
+  state.challenge.elapsedMs = elapsedMs;
+  state.challenge.lastResult = result;
+  showResultMark(result.double > 0 ? "double" : "single", "けっか！");
+  setMessage(`チャレンジ おしまい！ ${result.score}てん`, "good");
+  render();
 }
 
 function renderCustomEditor() {
@@ -2151,6 +2443,19 @@ function questionListRows() {
   addWordQuestionRows(rows, LEVELS.DAKUTEN, currentWordSet(LEVELS.DAKUTEN));
   addWordQuestionRows(rows, LEVELS.SMALL, currentWordSet(LEVELS.SMALL));
   addWordQuestionRows(rows, LEVELS.LONG, currentWordSet(LEVELS.LONG));
+
+  soundMarkLessons.forEach((lesson) => {
+    rows.push({
+      levelId: LEVELS.SOUND,
+      level: LEVEL_NAMES[LEVELS.SOUND],
+      picture: lesson.picture,
+      prompt: lesson.kana,
+      answer: lesson.kana,
+      writing: lesson.kana,
+      source: "標準",
+      sourceKey: "standard"
+    });
+  });
 
   currentWordSet(LEVELS.SENTENCE).forEach((lesson) => {
     const isCustom = lesson.source === "custom";
@@ -2427,6 +2732,12 @@ function isCustomTestActive() {
 }
 
 function startCustomLessonTest(id) {
+  if (state.challenge.active || state.challenge.finished) {
+    state.challenge.active = false;
+    state.challenge.finished = false;
+    state.challenge.lastResult = null;
+  }
+
   const lesson = state.customLessons.find((item) => item.id === id);
   if (!lesson) {
     setCustomLessonMessage("テストする問題が見つかりません。", "alert");
@@ -2889,10 +3200,15 @@ function renderLevelPanel() {
   levelFourButton.classList.toggle("is-active", state.activeLevel === LEVELS.SMALL);
   levelFiveButton.classList.toggle("is-active", state.activeLevel === LEVELS.LONG);
   levelSixButton.classList.toggle("is-active", state.activeLevel === LEVELS.SENTENCE);
+  levelSoundButton.classList.toggle("is-active", state.activeLevel === LEVELS.SOUND);
   levelSixButton.classList.toggle("is-locked", FROZEN_LEVELS.has(LEVELS.SENTENCE));
   levelSixButton.setAttribute("aria-disabled", String(FROZEN_LEVELS.has(LEVELS.SENTENCE)));
 
-  if (state.activeLevel === LEVELS.SENTENCE) {
+  if (state.challenge.active) {
+    levelStatusText.textContent = `チャレンジ ${state.challenge.answered} / ${state.challenge.goal} もん`;
+  } else if (state.activeLevel === LEVELS.SOUND) {
+    levelStatusText.textContent = "がぎぐげご・ぱぴぷぺぽなどを れんしゅう";
+  } else if (state.activeLevel === LEVELS.SENTENCE) {
     levelStatusText.textContent = "ぶんを つなぐ 1もじを れんしゅう";
   } else if (state.activeLevel === LEVELS.LONG) {
     levelStatusText.textContent = "3もじ いじょうの ことばを れんしゅう";
@@ -2941,7 +3257,7 @@ function createTargetPlaceholder() {
 
 function renderStrokeList(lesson) {
   strokeList.innerHTML = "";
-  strokeList.hidden = state.activeLevel !== LEVELS.TRACE && !state.showTrace && !isLessonComplete();
+  strokeList.hidden = !isTraceLevel() && !state.showTrace && !isLessonComplete();
   if (strokeList.hidden) {
     return;
   }
@@ -2965,12 +3281,12 @@ function renderStrokeList(lesson) {
 
 function renderStageStrip() {
   stageStrip.innerHTML = "";
-  stageStrip.hidden = !state.stageListOpen || state.activeLevel !== LEVELS.TRACE;
+  stageStrip.hidden = !state.stageListOpen || !isTraceLevel();
   if (stageStrip.hidden) {
     return;
   }
 
-  lessons.forEach((lesson, index) => {
+  currentTraceSet().forEach((lesson, index) => {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "stage-button";
@@ -2984,19 +3300,19 @@ function renderStageStrip() {
       check.textContent = "✓";
       button.append(check);
     }
-    button.addEventListener("click", () => selectLesson(index));
+    button.addEventListener("click", () => selectLesson(index, state.activeLevel));
     stageStrip.append(button);
   });
 }
 
-function selectLesson(index) {
-  state.activeLevel = LEVELS.TRACE;
+function selectLesson(index, level = state.activeLevel) {
+  state.activeLevel = isTraceLevel(level) ? level : LEVELS.TRACE;
   state.customTestId = "";
   state.lessonIndex = index;
   state.wordCharIndex = 0;
   state.stageListOpen = false;
   resetCurrentWriting();
-  setMessage("1かくめを、まるから おてほんに そって なぞろう", "normal");
+  setMessage(traceLevelStartMessage(), "normal");
   render();
 }
 
@@ -3007,7 +3323,7 @@ function resetCurrentWriting() {
   state.liveStroke = [];
   state.drawing = false;
   state.missCount = 0;
-  state.showTrace = state.activeLevel === LEVELS.TRACE;
+  state.showTrace = isTraceLevel();
   hideResultFeedback();
 }
 
@@ -3035,8 +3351,15 @@ function goNextLesson() {
     return;
   }
 
-  const nextIndex = (state.lessonIndex + 1) % lessons.length;
-  selectLesson(nextIndex);
+  const traceSet = currentTraceSet();
+  let nextIndex = (state.lessonIndex + 1) % traceSet.length;
+  if (state.challenge.active) {
+    nextIndex = Math.floor(Math.random() * Math.max(traceSet.length, 1));
+    if (traceSet.length > 1 && nextIndex === state.lessonIndex) {
+      nextIndex = (nextIndex + 1) % traceSet.length;
+    }
+  }
+  selectLesson(nextIndex, state.activeLevel);
 }
 
 function selectLevel(level) {
@@ -3051,6 +3374,12 @@ function selectLevel(level) {
     closeMenuAfterCompactChoice();
     render();
     return;
+  }
+
+  if (state.challenge.active || state.challenge.finished) {
+    state.challenge.active = false;
+    state.challenge.finished = false;
+    state.challenge.lastResult = null;
   }
 
   state.activeLevel = level;
@@ -3073,7 +3402,7 @@ function selectLevel(level) {
     state.wordCharIndex = 0;
     state.lessonIndex = 0;
     resetCurrentWriting();
-    setMessage("1かくめを、まるから おてほんに そって なぞろう", "normal");
+    setMessage(traceLevelStartMessage(), "normal");
   }
 
   closeMenuAfterCompactChoice();
@@ -3088,6 +3417,12 @@ function closeMenuAfterCompactChoice() {
   state.menuPanelTouched = true;
   state.menuPanelOpen = false;
   state.adultPanelOpen = false;
+}
+
+function traceLevelStartMessage() {
+  return state.activeLevel === LEVELS.SOUND
+    ? "てんてん・まるの もじを かいてみよう"
+    : "1かくめを、まるから おてほんに そって なぞろう";
 }
 
 function wordLevelStartMessage() {
@@ -3118,7 +3453,7 @@ function toggleMenuPanel() {
 }
 
 function toggleStageList() {
-  if (state.activeLevel !== LEVELS.TRACE) {
+  if (!isTraceLevel()) {
     return;
   }
 
@@ -3262,6 +3597,8 @@ clearButton.addEventListener("click", clearLesson);
 hintButton.addEventListener("click", toggleHint);
 nextButton.addEventListener("click", handleNextButton);
 menuToggleButton.addEventListener("click", toggleMenuPanel);
+challengeToggleButton.addEventListener("click", toggleChallengeMode);
+challengeRestartButton.addEventListener("click", startChallengeMode);
 stageToggleButton.addEventListener("click", toggleStageList);
 adultToggleButton.addEventListener("click", toggleAdultPanel);
 customEditorButton.addEventListener("click", toggleCustomEditor);
@@ -3283,6 +3620,7 @@ levelThreeButton.addEventListener("click", () => selectLevel(LEVELS.DAKUTEN));
 levelFourButton.addEventListener("click", () => selectLevel(LEVELS.SMALL));
 levelFiveButton.addEventListener("click", () => selectLevel(LEVELS.LONG));
 levelSixButton.addEventListener("click", () => selectLevel(LEVELS.SENTENCE));
+levelSoundButton.addEventListener("click", () => selectLevel(LEVELS.SOUND));
 
 resizeCanvas();
 render();

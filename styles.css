@@ -126,6 +126,17 @@ h1 {
   background: #f5f7ff;
 }
 
+.tool-button.challenge {
+  border-color: #fed7aa;
+  color: #9a3412;
+  background: #fff7ed;
+}
+
+.tool-button.challenge.is-active {
+  border-color: #fb923c;
+  background: #ffedd5;
+}
+
 .tool-button.menu {
   border-color: #b7d4f5;
   color: var(--blue-dark);
@@ -188,6 +199,66 @@ h1 {
   font-weight: 800;
   display: grid;
   align-items: center;
+}
+
+.challenge-panel,
+.challenge-result-panel {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 16px;
+  border: 2px solid #fed7aa;
+  border-radius: 8px;
+  background: #fff7ed;
+  box-shadow: var(--shadow);
+}
+
+.challenge-panel {
+  grid-template-columns: repeat(4, minmax(110px, 1fr));
+  padding: 10px;
+}
+
+.challenge-panel div,
+.challenge-result-panel > div {
+  display: grid;
+  gap: 3px;
+  min-height: 52px;
+  align-content: center;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.challenge-panel span,
+.challenge-result-panel span,
+.challenge-kicker {
+  margin: 0;
+  color: #9a3412;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.challenge-panel strong,
+.challenge-result-panel strong {
+  color: #7c2d12;
+  font-size: 1.18rem;
+  line-height: 1.1;
+}
+
+.challenge-result-panel {
+  grid-template-columns: minmax(200px, 1fr) minmax(150px, 0.7fr) auto;
+  align-items: stretch;
+  padding: 12px;
+}
+
+.challenge-result-panel h2 {
+  margin: 0;
+  color: #7c2d12;
+  font-size: 1.45rem;
+  line-height: 1.1;
+}
+
+.challenge-result-panel p {
+  margin: 0;
 }
 
 .adult-panel {
@@ -1072,6 +1143,15 @@ h1 {
     grid-template-columns: repeat(3, 1fr);
   }
 
+  .challenge-panel,
+  .challenge-result-panel {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .challenge-result-panel .tool-button {
+    grid-column: 1 / -1;
+  }
+
   .adult-panel {
     grid-template-columns: 1fr;
   }
@@ -1173,6 +1253,11 @@ h1 {
   }
 
   .level-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .challenge-panel,
+  .challenge-result-panel {
     grid-template-columns: 1fr;
   }
 

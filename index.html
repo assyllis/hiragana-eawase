@@ -15,10 +15,11 @@
         </div>
         <div class="top-tools">
           <div class="score-panel" aria-live="polite">
-            <span class="score-label">できた</span>
+            <span id="scoreLabel" class="score-label">できた</span>
             <strong id="scoreText">0 / 46</strong>
           </div>
           <button id="menuToggleButton" class="tool-button menu" type="button" aria-expanded="true" aria-controls="levelPanel adultPanel">メニュー</button>
+          <button id="challengeToggleButton" class="tool-button challenge" type="button" aria-pressed="false">チャレンジ</button>
           <button id="stageToggleButton" class="tool-button" type="button">もじをえらぶ</button>
           <button id="adultToggleButton" class="tool-button adult" type="button" aria-expanded="false" aria-controls="adultPanel">おとな</button>
         </div>
@@ -53,7 +54,43 @@
           <span>れべる6</span>
           <strong>つなぎ</strong>
         </button>
+        <button id="levelSoundButton" class="level-button" type="button">
+          <span>れべる7</span>
+          <strong>だくおん</strong>
+        </button>
         <p id="levelStatusText" class="level-status">れべるは じゆうに えらべるよ</p>
+      </section>
+
+      <section id="challengePanel" class="challenge-panel" aria-label="チャレンジのスコア" hidden>
+        <div>
+          <span>いま</span>
+          <strong id="challengeScoreText">0てん</strong>
+        </div>
+        <div>
+          <span>もんだい</span>
+          <strong id="challengeRoundText">0 / 10</strong>
+        </div>
+        <div>
+          <span>◎</span>
+          <strong id="challengeDoubleText">0こ</strong>
+        </div>
+        <div>
+          <span>これまで</span>
+          <strong id="challengeBestText">0てん</strong>
+        </div>
+      </section>
+
+      <section id="challengeResultPanel" class="challenge-result-panel" aria-label="チャレンジのけっか" hidden>
+        <div>
+          <p class="challenge-kicker">チャレンジけっか</p>
+          <h2 id="challengeResultTitle">0てん</h2>
+          <p id="challengeResultDetail">0もん / ◎0こ</p>
+        </div>
+        <div>
+          <span>これまでの いちばん</span>
+          <strong id="challengeResultBest">0てん</strong>
+        </div>
+        <button id="challengeRestartButton" class="tool-button challenge" type="button">もういちど</button>
       </section>
 
       <section id="adultPanel" class="adult-panel" aria-label="おとなのかくにん" hidden>
@@ -121,6 +158,7 @@
                 <option value="small">レベル4</option>
                 <option value="long">レベル5</option>
                 <option value="sentence">レベル6</option>
+                <option value="sound">レベル7</option>
               </select>
             </label>
             <label>
